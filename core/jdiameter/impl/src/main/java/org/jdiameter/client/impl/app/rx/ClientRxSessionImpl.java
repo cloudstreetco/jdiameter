@@ -567,6 +567,18 @@ public class ClientRxSessionImpl extends AppRxSessionImpl implements ClientRxSes
     //                logger.debug("Failure processing timeout message for request", e);
     //            }
     //        }
+    if( request.getCommandCode() == RxAAAnswer.code ) {
+      try {
+        sendAndStateLock.lock();
+        handleSendFailure( null, null, request );
+      }
+      catch( Exception e ) {
+        logger.debug( "Failure processing timeout message for request", e );
+      }
+      finally {
+        sendAndStateLock.unlock();
+      }
+    }
   }
 
   protected void setState(ClientRxSessionState newState) {
@@ -623,11 +635,19 @@ public class ClientRxSessionImpl extends AppRxSessionImpl implements ClientRxSes
     //finally {
     //  dispatch();
     //}
+    try {
+      this.context.denyAccessOnDeliverFailure( this, request );
+      setState( ClientRxSessionState.IDLE, true );
+    }
+    finally {
+      dispatch();
+    }
   }
 
   protected void handleFailureMessage(final AppAnswerEvent event, final AppRequestEvent request, final Event.Type eventType) {
     try {
-      setState(ClientRxSessionState.IDLE);
+      this.context.denyAccessOnFailureMessage( this );
+      setState( ClientRxSessionState.IDLE, true );
     }
     catch (Exception e) {
       if (logger.isDebugEnabled()) {
